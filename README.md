@@ -6,15 +6,17 @@
 
 ## Overview
 
-**Justitia** is a novel approach to privacy-preserving OCR that implements **vision-level token masking** for PHI (Protected Health Information) compliance. Unlike traditional text-based redaction methods that operate after OCR extraction, Justitia detects and masks sensitive information at the vision token stage, preventing PHI from ever being processed by the language model decoder.
+**Justitia** is a research exploration of **vision-level token masking** for PHI (Protected Health Information) compliance in OCR systems. Unlike traditional text-based redaction methods that operate after OCR extraction, this approach investigates detecting and masking sensitive information at the vision token stage, attempting to prevent PHI from ever being processed by the language model decoder.
 
-### Key Innovation
+### Research Approach
 
-The core innovation is **selective vision token masking** - identifying and masking PHI tokens before they reach the text generation decoder. This approach provides:
+The core idea is **selective vision token masking** - identifying and masking PHI tokens before they reach the text generation decoder. This approach theoretically could provide:
 
-- **Stronger Privacy Guarantees**: PHI never enters the text generation pipeline
-- **Better Utility Preservation**: Non-PHI medical context remains intact for downstream processing
-- **Efficient Implementation**: Uses LoRA adapters for lightweight PHI detection without modifying the base model
+- **Stronger Privacy Guarantees**: PHI would never enter the text generation pipeline
+- **Better Utility Preservation**: Non-PHI medical context could remain intact for downstream processing
+- **Efficient Implementation**: LoRA adapters for lightweight PHI detection without modifying the base model
+
+**Note**: This repository contains the implementation and data generation infrastructure. No actual model training was successfully completed. See [Project Status](#project-status) for details.
 
 ## Architecture
 
@@ -40,14 +42,14 @@ Input PDF → Vision Encoder → PHI Detection (LoRA) → Token Masking → Deep
    - **Selective Attention Masking**: ToSA-inspired attention mechanism
    - **Hybrid Approach**: Combines both for optimal privacy-utility tradeoff
 
-## Features
+## What's Included
 
-- **Vision-Level PHI Detection**: Identifies sensitive information before text extraction
-- **HIPAA Safe Harbor Compliant**: Covers all 18 HIPAA PHI identifiers
-- **Dual Masking Strategies**: Token replacement and selective attention mechanisms
-- **Synthetic Data Pipeline**: Uses Synthea for generating realistic medical PDFs with PHI annotations
-- **Efficient Fine-tuning**: LoRA adapters for parameter-efficient training
-- **Evaluation Framework**: Comprehensive metrics for privacy and utility assessment
+- **Synthetic Data Pipeline**: Fully functional pipeline using Synthea for generating realistic medical PDFs with PHI annotations
+- **LoRA Architecture Code**: Implementation of LoRA adapters for vision token PHI detection (not trained)
+- **PHI Annotation Tools**: Preprocessing pipeline for marking PHI in synthetic documents
+- **Multiple Masking Strategies**: Code for token replacement and selective attention mechanisms (experimental)
+- **HIPAA Safe Harbor Coverage**: Designed to handle all 18 HIPAA PHI identifier categories
+- **Configuration Files**: Model and training configurations for DeepSeek-OCR integration
 
 ## Quick Start
 
@@ -78,6 +80,8 @@ python scripts/download_model.py
 
 ### Generate Synthetic Medical Data
 
+The primary working component is the data generation pipeline:
+
 ```bash
 # Setup Synthea (synthetic patient generator)
 bash scripts/setup_synthea.sh
@@ -89,24 +93,20 @@ bash scripts/generate_synthea_data.sh
 python scripts/generate_clinical_notes.py --output-dir data/pdfs --num-documents 1000
 ```
 
-### Train PHI Detection LoRA
+### Explore the Code
 
 ```bash
-python src/training/lora_phi_detector.py \
-    --config config/training_config.yaml \
-    --data-dir data/pdfs \
-    --output-dir models/lora_adapters
+# View the LoRA adapter implementation
+cat src/training/lora_phi_detector.py
+
+# Check the PHI annotation tools
+cat src/preprocessing/phi_annotator.py
+
+# Review configuration files
+cat config/training_config.yaml
 ```
 
-### Run Inference
-
-```bash
-python src/inference/process_documents.py \
-    --input path/to/medical.pdf \
-    --output path/to/redacted_output.txt \
-    --masking-strategy selective_attention \
-    --lora-checkpoint models/lora_adapters/best_model
-```
+**Note**: The training and inference pipelines are not functional. The code is provided for reference and future development.
 
 ## Project Structure
 
@@ -223,31 +223,22 @@ target_modules:               # Attention layers to target
 task_type: PHI_DETECTION
 ```
 
-### Training Details
-
-- **Dataset**: 10,000+ synthetic medical PDFs from Synthea
-- **Batch Size**: 8 (with gradient accumulation: 4)
-- **Learning Rate**: 2e-4 with cosine annealing
-- **Epochs**: 10
-- **Hardware**: Single A100 40GB GPU
-- **Training Time**: ~8 hours
-
 ## Project Status
 
-**Current State**: Early research prototype with synthetic data generation pipeline completed. Initial LoRA training experiments showed limitations in the approach.
+**Current State**: Research prototype with functional data generation infrastructure. The LoRA-based vision token masking approach was implemented but not successfully trained.
 
 ### Completed
 - [x] Project structure and configuration
 - [x] Synthea integration for synthetic patient data
 - [x] PDF generation pipeline with PHI annotations
 - [x] PHI annotation and preprocessing tools
-- [x] Initial LoRA adapter implementation
-- [x] Basic training pipeline (results were suboptimal)
+- [x] LoRA adapter architecture implementation (code only, not trained)
 
 ### Known Limitations
-- Initial training approach did not achieve target performance
-- Vision token masking effectiveness needs further research
-- Alternative architectures may be required
+- No successful model training was completed
+- The vision-level masking approach proved more challenging than anticipated
+- Infrastructure and data generation are functional, but the core ML approach needs rethinking
+- Alternative architectures or hybrid approaches may be required
 
 ### Future Directions
 - Explore alternative masking strategies
