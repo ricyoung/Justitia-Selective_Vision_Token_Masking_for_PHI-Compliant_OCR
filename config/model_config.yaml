@@ -1,0 +1,120 @@
+# DeepSeek-OCR Model Configuration
+
+model:
+  name: "deepseek-ai/DeepSeek-OCR"
+  cache_dir: "./models/deepseek_ocr"
+  device: "cuda"  # or "cpu" if no GPU available
+  dtype: "float16"  # Use float32 for CPU, float16/bfloat16 for GPU
+
+  # Vision encoder settings
+  encoder:
+    sam_block:
+      window_size: 16
+      num_heads: 8
+    clip_block:
+      hidden_size: 1024
+      num_attention_heads: 16
+    convolution:
+      reduction_factor: 16  # Reduces tokens by 16x
+
+  # Text decoder settings
+  decoder:
+    max_length: 4096
+    temperature: 0.1  # Lower for more deterministic outputs
+    top_p: 0.95
+    do_sample: false  # Set to true for more diverse outputs
+
+# LoRA Adapter Configuration
+lora:
+  rank: 16  # Low-rank dimension
+  alpha: 32  # LoRA scaling parameter
+  dropout: 0.1  # Dropout probability
+  target_modules:
+    - "q_proj"
+    - "v_proj"
+    - "k_proj"
+    - "o_proj"
+  modules_to_save:
+    - "classifier"  # PHI detection head
+  task_type: "VISION_PHI_DETECTION"
+
+# PHI Detection Settings
+phi_detection:
+  # HIPAA PHI Categories
+  categories:
+    - "name"           # Patient, physician, family names
+    - "date"          # Birth dates, admission/discharge dates
+    - "address"       # Street address, city, state (except state alone)
+    - "phone"         # Phone and fax numbers
+    - "email"         # Email addresses
+    - "ssn"           # Social Security Numbers
+    - "mrn"           # Medical Record Numbers
+    - "insurance_id"  # Health plan beneficiary numbers
+    - "account"       # Account numbers
+    - "license"       # Certificate/license numbers
+    - "vehicle"       # Vehicle identifiers and license plates
+    - "device_id"     # Device identifiers and serial numbers
+    - "url"           # Web URLs
+    - "ip"            # IP addresses
+    - "biometric"     # Biometric identifiers (fingerprints, photos)
+    - "unique_id"     # Any other unique identifying number
+    - "geo_small"     # Geographic subdivisions smaller than state
+    - "institution"   # Healthcare facility names
+
+  # Confidence thresholds
+  confidence_threshold: 0.85
+  high_risk_threshold: 0.95  # For highly sensitive categories
+
+# Token Masking Configuration
+masking:
+  # Strategy: "token_replacement", "selective_attention", or "hybrid"
+  strategy: "hybrid"
+
+  token_replacement:
+    mask_token: "[PHI_REDACTED]"
+    preserve_structure: true  # Keep document layout
+    replacement_embeddings: "learned"  # or "static"
+
+  selective_attention:
+    attention_weight: 0.0  # Weight for masked tokens
+    skip_layers: [0, 1]  # Layers to skip masking
+    gradual_masking: true  # Gradually increase masking strength
+
+  hybrid:
+    primary_strategy: "selective_attention"
+    fallback_strategy: "token_replacement"
+    switch_threshold: 0.9  # Confidence to switch strategies
+
+# Vision Processing
+vision:
+  input_size: [1024, 1024]  # Standard input size
+  patch_size: 16
+  num_patches: 4096  # (1024/16)^2
+  compressed_tokens: 256  # After 16x reduction
+
+  preprocessing:
+    resize_method: "lanczos"
+    normalize: true
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+
+# Performance Optimization
+optimization:
+  use_flash_attention: true
+  gradient_checkpointing: true
+  mixed_precision: true
+  compile_model: false  # Set to true for torch.compile optimization
+
+# Inference Settings
+inference:
+  batch_size: 1  # Increase for batch processing
+  num_beams: 1  # Beam search width
+  early_stopping: true
+  max_new_tokens: 2048
+
+# Logging and Monitoring
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  save_attention_maps: false
+  log_phi_detections: true
+  anonymize_logs: true
