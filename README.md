@@ -232,19 +232,32 @@ task_type: PHI_DETECTION
 - **Hardware**: Single A100 40GB GPU
 - **Training Time**: ~8 hours
 
-## Development Roadmap
+## Project Status
 
+**Current State**: Early research prototype with synthetic data generation pipeline completed. Initial LoRA training experiments showed limitations in the approach.
+
+### Completed
 - [x] Project structure and configuration
 - [x] Synthea integration for synthetic patient data
 - [x] PDF generation pipeline with PHI annotations
 - [x] PHI annotation and preprocessing tools
-- [x] LoRA adapter implementation
-- [ ] Complete training pipeline with evaluation
-- [ ] Inference engine with masking strategies
-- [ ] Comprehensive evaluation framework
-- [ ] Benchmarking against baseline methods
-- [ ] Documentation and tutorials
-- [ ] Paper submission to arXiv/conference
+- [x] Initial LoRA adapter implementation
+- [x] Basic training pipeline (results were suboptimal)
+
+### Known Limitations
+- Initial training approach did not achieve target performance
+- Vision token masking effectiveness needs further research
+- Alternative architectures may be required
+
+### Future Directions
+- Explore alternative masking strategies
+- Investigate different vision encoder fine-tuning approaches
+- Consider hybrid text-vision detection methods
+- Benchmark against traditional OCR + NER pipelines
+
+## Paper
+
+A paper describing this work has been submitted for peer review. The paper, experimental results, and additional materials are available in the `not_uploaded/` directory (not included in this public repository).
 
 ## Citation
 
@@ -254,7 +267,7 @@ If you use this work in your research, please cite:
 @article{justitia2025,
   title={Justitia: Selective Vision Token Masking for PHI-Compliant OCR},
   author={Your Name},
-  journal={arXiv preprint arXiv:2025.xxxxx},
+  journal={Under Review},
   year={2025}
 }
 ```
