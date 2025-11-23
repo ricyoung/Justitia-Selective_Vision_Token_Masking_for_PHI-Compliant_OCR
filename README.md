@@ -1,55 +1,73 @@
-# Justitia: Selective Vision Token Masking for PHI-Compliant OCR
+# Vision Token Masking Cannot Prevent PHI Leakage: A Negative Result
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![arXiv](https://img.shields.io/badge/arXiv-2025.xxxxx-b31b1b.svg)](https://arxiv.org/)
+[![Paper](https://img.shields.io/badge/paper-under%20review-red.svg)](https://deepneuro.ai/richard)
+
+> **Author**: Richard J. Young
+> **Affiliation**: Founding AI Scientist, [DeepNeuro.AI](https://deepneuro.ai/richard) | University of Nevada, Las Vegas, Department of Neuroscience
+> **Links**: [HuggingFace](https://huggingface.co/richardyoung) | [DeepNeuro.AI](https://deepneuro.ai/richard)
 
 ## Overview
 
-**Justitia** is a research exploration of **vision-level token masking** for PHI (Protected Health Information) compliance in OCR systems. Unlike traditional text-based redaction methods that operate after OCR extraction, this approach investigates detecting and masking sensitive information at the vision token stage, attempting to prevent PHI from ever being processed by the language model decoder.
+This repository contains the systematic evaluation code and data generation pipeline for our paper **"Vision Token Masking Alone Cannot Prevent PHI Leakage in Medical Document OCR"**.
 
-### Research Approach
+**Key Finding**: Vision-level token masking in VLMs achieves only **42.9% PHI reduction** regardless of masking strategy, successfully suppressing long-form identifiers (names, addresses) at 100% effectiveness while completely failing on short structured identifiers (SSN, medical record numbers) at 0% effectiveness.
 
-The core idea is **selective vision token masking** - identifying and masking PHI tokens before they reach the text generation decoder. This approach theoretically could provide:
+### The Negative Result
 
-- **Stronger Privacy Guarantees**: PHI would never enter the text generation pipeline
-- **Better Utility Preservation**: Non-PHI medical context could remain intact for downstream processing
-- **Efficient Implementation**: LoRA adapters for lightweight PHI detection without modifying the base model
+We evaluated **seven masking strategies** (V3-V9) across different architectural layers of DeepSeek-OCR using 100 synthetic medical billing statements (from a corpus of 38,517 annotated documents):
 
-**Note**: This repository contains the implementation and data generation infrastructure. No actual model training was successfully completed. See [Project Status](#project-status) for details.
+- **What Worked**: 100% reduction of patient names, dates of birth, physical addresses (spatially-distributed long-form PHI)
+- **What Failed**: 0% reduction of SSN, medical record numbers, email addresses, account numbers (short structured identifiers)
+- **The Ceiling**: All strategies converged to 42.9% total PHI reduction
+- **Why**: Language model contextual inference—not insufficient visual masking—drives structured identifier leakage
+
+This establishes **fundamental boundaries** for vision-only privacy interventions in VLMs and redirects future research toward decoder-level fine-tuning and hybrid defense-in-depth architectures.
 
 ## Architecture
 
 ```
-Input PDF → Vision Encoder → PHI Detection (LoRA) → Token Masking → DeepSeek-OCR → Safe Text Output
-              (SAM + CLIP)      (256 tokens)         (Replace/Mask)     (Decoder)
+Input PDF → Vision Encoder → PHI Detection → Vision Token Masking → DeepSeek Decoder → Text Output
+              (SAM + CLIP)    (Ground Truth)   (V3-V9 Strategies)      (3B-MoE)
 ```
 
-### Components
+### Experimental Approach
 
-1. **Base Model**: DeepSeek-OCR (~950M parameters)
+1. **Base Model**: DeepSeek-OCR
    - Vision Encoder: SAM-base + CLIP-large blocks
    - Text Decoder: DeepSeek-3B-MoE
    - Processes 1024×1024 images to 256 vision tokens
 
-2. **PHI Detection**: LoRA Adapter (Rank 8-16)
-   - Trained to identify PHI tokens in vision space
-   - Targets vision encoder attention layers
-   - Parameter-efficient: <1% of base model parameters
+2. **PHI Detection**: Ground-truth annotations from synthetic data generation
+   - Perfect bounding box annotations for all 18 HIPAA PHI categories
+   - No learned detection model - direct annotation-based masking
 
-3. **Masking Strategies**:
-   - **Token Replacement**: Substitute PHI tokens with privacy-preserving embeddings
-   - **Selective Attention Masking**: ToSA-inspired attention mechanism
-   - **Hybrid Approach**: Combines both for optimal privacy-utility tradeoff
+3. **Seven Masking Strategies (V3-V9)**:
+   - **V3-V5**: SAM encoder blocks at different depths
+   - **V6**: Compression layer (4096→1024 tokens)
+   - **V7**: Dual vision encoders (SAM + CLIP)
+   - **V8**: Post-compression stage
+   - **V9**: Projector fusion layer
 
-## What's Included
+## Research Contributions
 
-- **Synthetic Data Pipeline**: Fully functional pipeline using Synthea for generating realistic medical PDFs with PHI annotations
-- **LoRA Architecture Code**: Implementation of LoRA adapters for vision token PHI detection (not trained)
-- **PHI Annotation Tools**: Preprocessing pipeline for marking PHI in synthetic documents
-- **Multiple Masking Strategies**: Code for token replacement and selective attention mechanisms (experimental)
-- **HIPAA Safe Harbor Coverage**: Designed to handle all 18 HIPAA PHI identifier categories
-- **Configuration Files**: Model and training configurations for DeepSeek-OCR integration
+### What This Work Provides
+
+1. **First Systematic Evaluation** of vision-level token masking for PHI protection in VLMs
+2. **Negative Result**: Establishes that vision masking alone is insufficient for HIPAA compliance
+3. **Boundary Conditions**: Identifies which PHI types are amenable to vision-level vs language-level redaction
+4. **38,517 Annotated Documents**: Massive synthetic medical document corpus with ground-truth PHI annotations
+5. **Seven Masking Strategies**: V3-V9 targeting SAM encoders, compression layers, dual vision encoders, and projector fusion
+6. **Ablation Studies**: Mask expansion radius variations (r=1,2,3) demonstrating spatial coverage limitations
+7. **Hybrid Architecture Simulation**: Shows 88.6% reduction when combining vision masking with NLP post-processing
+
+### What's in This Repository
+
+- **Synthetic Data Pipeline**: Fully functional Synthea-based pipeline generating 38,517+ annotated medical PDFs
+- **PHI Annotation Tools**: Ground-truth annotation pipeline for all 18 HIPAA identifier categories
+- **Evaluation Framework**: Code for measuring PHI reduction across masking strategies
+- **Configuration Files**: DeepSeek-OCR integration and experimental parameters
 
 ## Quick Start
 
@@ -203,48 +221,42 @@ Following HIPAA Safe Harbor guidelines, Justitia detects and masks:
 
 ### Vision Token Processing
 
-DeepSeek-OCR compresses a 1024×1024 image to 256 vision tokens:
+DeepSeek-OCR compresses a 1024×1024 image through multiple stages:
 1. **SAM-base block**: Windowed attention for local detail (4096 tokens)
 2. **CLIP-large block**: Global attention for layout understanding (1024 tokens)
 3. **Convolution layer**: 16x token reduction to 256 tokens
+4. **Projector fusion**: Maps vision tokens to language model space
 
 Each vision token represents a ~64×64 pixel region with semantic and spatial information.
 
-### LoRA Configuration
+### Masking Implementation
 
-```yaml
-rank: 16                      # LoRA rank
-alpha: 32                     # LoRA alpha (scaling factor)
-dropout: 0.1                  # Dropout rate
-target_modules:               # Attention layers to target
-  - q_proj
-  - v_proj
-  - k_proj
-task_type: PHI_DETECTION
-```
+Vision tokens corresponding to PHI bounding boxes are zeroed at different architectural layers (V3-V9). Ablation studies tested mask expansion radius r=1,2,3 to determine if spatial coverage affects reduction rates.
 
-## Project Status
+## Experimental Results
 
-**Current State**: Research prototype with functional data generation infrastructure. The LoRA-based vision token masking approach was implemented but not successfully trained.
+### Main Findings
 
-### Completed
-- [x] Project structure and configuration
-- [x] Synthea integration for synthetic patient data
-- [x] PDF generation pipeline with PHI annotations
-- [x] PHI annotation and preprocessing tools
-- [x] LoRA adapter architecture implementation (code only, not trained)
+| Masking Strategy | Layer Target | PHI Reduction | Names | DOB | SSN | MRN | Addresses |
+|-----------------|--------------|---------------|-------|-----|-----|-----|-----------|
+| **V3-V9 (all)** | Various | **42.9%** | 100% | 100% | 0% | 0% | 100% |
+| Baseline | None | 0% | 0% | 0% | 0% | 0% | 0% |
+| Hybrid (sim) | Vision + NLP | **88.6%** | 100% | 100% | 80% | 80% | 100% |
 
-### Known Limitations
-- No successful model training was completed
-- The vision-level masking approach proved more challenging than anticipated
-- Infrastructure and data generation are functional, but the core ML approach needs rethinking
-- Alternative architectures or hybrid approaches may be required
+### Key Insights
 
-### Future Directions
-- Explore alternative masking strategies
-- Investigate different vision encoder fine-tuning approaches
-- Consider hybrid text-vision detection methods
-- Benchmark against traditional OCR + NER pipelines
+1. **Convergence**: All seven masking strategies (V3-V9) achieved identical 42.9% reduction regardless of architectural layer
+2. **Spatial Invariance**: Mask expansion radius (r=1,2,3) did not improve reduction beyond this ceiling
+3. **Type-Dependent Success**:
+   - ✅ Long-form spatially-distributed PHI: 100% reduction
+   - ❌ Short structured identifiers: 0% reduction
+4. **Root Cause**: Language model contextual inference reconstructs masked structured identifiers from document context
+
+### Implications for Privacy-Preserving VLMs
+
+- Vision-only masking is **insufficient for HIPAA compliance** (requires 99%+ reduction)
+- Hybrid architectures combining vision masking with NLP post-processing are necessary
+- Future work should focus on decoder-level fine-tuning or defense-in-depth approaches
 
 ## Paper
 
@@ -255,11 +267,13 @@ A paper describing this work has been submitted for peer review. The paper, expe
 If you use this work in your research, please cite:
 
 ```bibtex
-@article{justitia2025,
-  title={Justitia: Selective Vision Token Masking for PHI-Compliant OCR},
-  author={Your Name},
+@article{young2025visionmasking,
+  title={Vision Token Masking Alone Cannot Prevent PHI Leakage in Medical Document OCR: A Systematic Evaluation},
+  author={Young, Richard J.},
+  institution={DeepNeuro.AI; University of Nevada, Las Vegas},
   journal={Under Review},
-  year={2025}
+  year={2025},
+  note={Code available at: https://github.com/ricyoung/Justitia-Selective_Vision_Token_Masking_for_PHI-Compliant_OCR}
 }
 ```
 
@@ -285,9 +299,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Contact
 
-For questions, collaboration, or feedback:
-- Open an issue on GitHub
-- Email: your.email@example.com
+**Richard J. Young**
+- Founding AI Scientist, DeepNeuro.AI
+- University of Nevada, Las Vegas, Department of Neuroscience
+- Website: [deepneuro.ai/richard](https://deepneuro.ai/richard)
+- HuggingFace: [@richardyoung](https://huggingface.co/richardyoung)
+- GitHub: Open an issue on this repository
 
 ---
 
